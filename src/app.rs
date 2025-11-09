@@ -73,9 +73,15 @@ use crate::app::{calculate::util::GenerationSettings, preset::Preset};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::closure::Closure;
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{prelude::*, JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
 use web_sys::{Worker, WorkerOptions, WorkerType, js_sys};
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn get_presets_js() -> JsValue {
+    serde_wasm_bindgen::to_value(&get_presets()).unwrap()
+}
 
 pub struct ObamifyApp {
     //prev_frame_time: std::time::Instant,
@@ -932,10 +938,11 @@ impl ObamifyApp {
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn start_job(&mut self, src: UnprocessedPreset, settings: GenerationSettings) {
+    fn start_job(&mut self, src: UnprocessedPreset, target: UnprocessedPreset, settings: GenerationSettings) {
         if let Some(w) = &self.worker {
             let req = calculate::worker::WorkerReq::Process {
                 source: src,
+                target: target,
                 settings,
             };
             let v = serde_wasm_bindgen::to_value(&req).unwrap();

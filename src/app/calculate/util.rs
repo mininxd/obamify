@@ -54,6 +54,7 @@ where
 #[allow(clippy::type_complexity)]
 pub(crate) fn get_images(
     source: SourceImg,
+    target: SourceImg,
     settings: &GenerationSettings,
 ) -> Result<(Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>, Vec<i64>), Box<dyn Error>> {
     let source = settings.source_crop_scale.apply(&source, settings.sidelen);
@@ -62,7 +63,7 @@ pub(crate) fn get_images(
         .map(|p| (p[0], p[1], p[2]))
         .collect::<Vec<_>>();
 
-    let (target, weights) = settings.get_target()?;
+    let (target, weights) = (target, vec![255; (settings.sidelen * settings.sidelen) as usize]);
     let target_pixels = target
         .pixels()
         .map(|p| (p[0], p[1], p[2]))

@@ -7,6 +7,7 @@ use web_sys::js_sys;
 pub enum WorkerReq {
     Process {
         source: crate::app::preset::UnprocessedPreset,
+        target: crate::app::preset::UnprocessedPreset,
         settings: super::GenerationSettings,
     },
 }
@@ -37,7 +38,11 @@ pub fn worker_entry() {
         };
 
         match req {
-            WorkerReq::Process { source, settings } => {
+            WorkerReq::Process {
+                source,
+                target,
+                settings,
+            } => {
                 // Run job; if you need to keep the UI responsive in the worker,
                 // wrap in an async task and yield occasionally.
                 let global2 = global_for_handler.clone();
@@ -49,7 +54,7 @@ pub fn worker_entry() {
 
                 // If you need to yield, you can insert tiny awaits between steps.
                 // Here we just call the portable sync fn:
-                if let Err(e) = process(source, settings, &mut sink) {
+                if let Err(e) = process(source, target, settings, &mut sink) {
                     sink(ProgressMsg::Error(e.to_string()));
                 }
             }
