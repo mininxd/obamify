@@ -1,7 +1,8 @@
-import init, { worker_entry } from './obamify.js';
+import init, { generate_with_gpu } from './pkg/obamify.js';
 
 class Generator {
     constructor(options = {}) {
+        this.gpu = options.gpu || false;
         this.proximity = options.proximity || 25;
         this.method = options.method || 'optimal'; // or 'fast'
         this.resolution = options.resolution || 128;
@@ -11,7 +12,7 @@ class Generator {
 
     async init_wasm() {
         if (!this.wasm_initialized) {
-            await init('./obamify_bg.wasm');
+            await init('./pkg/obamify_bg.wasm');
             this.wasm_initialized = true;
         }
     }
@@ -24,12 +25,12 @@ class Generator {
 
             worker.onmessage = (e) => {
                 const msg = e.data;
-                if (msg.type === 'Progress') {
+                if (msg.type === 'progress') {
                     this.onProgress(msg.payload);
-                } else if (msg.type === 'Done') {
+                } else if (msg.type === 'done') {
                     worker.terminate();
                     resolve(msg.payload);
-                } else if (msg.type === 'Error') {
+                } else if (msg.type === 'error') {
                     worker.terminate();
                     reject(msg.payload);
                 }
@@ -71,15 +72,12 @@ class Generator {
                 source_crop_scale: { x: 0.0, y: 0.0, scale: 1.0 },
             };
 
-            const req = {
-                Process: {
-                    source: sourcePreset,
-                    target: targetPreset,
-                    settings,
-                },
-            };
-
-            worker.postMessage(req);
+            worker.postMessage({
+                source: sourcePreset,
+                target: targetPreset,
+                settings,
+                gpu: this.gpu,
+            });
         });
     }
 }

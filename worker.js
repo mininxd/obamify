@@ -1,12 +1,17 @@
-const params = new URLSearchParams(self.location.search)
-const scriptName = params.get("script") || "./obamify.js"
+import init, { generate_with_gpu } from './pkg/obamify.js';
 
-try {
-  const obamifyModule = await import(scriptName)
-  const wasmName = scriptName.replace(".js", "_bg.wasm")
+async function main() {
+    await init('./pkg/obamify_bg.wasm');
 
-  await obamifyModule.default(wasmName)
-} catch (e) {
-  console.error("worker failed to initialize:", e)
-  throw e
+    self.onmessage = async (e) => {
+        const { source, target, settings, gpu } = e.data;
+        try {
+            const result = await generate_with_gpu(source, target, settings, gpu);
+            self.postMessage({ type: 'done', payload: result });
+        } catch (error) {
+            self.postMessage({ type: 'error', payload: error });
+        }
+    };
 }
+
+main();

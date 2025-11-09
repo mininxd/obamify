@@ -1,4 +1,5 @@
-use eframe::wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use serde::{Deserialize, Serialize};
 use web_sys::DedicatedWorkerGlobalScope;
 use web_sys::js_sys;
@@ -8,16 +9,12 @@ pub enum WorkerReq {
     Process {
         source: crate::app::preset::UnprocessedPreset,
         target: crate::app::preset::UnprocessedPreset,
-        settings: super::GenerationSettings,
+        settings: crate::app::calculate::util::GenerationSettings,
     },
 }
 
 use crate::app::calculate::ProgressMsg;
 use crate::app::calculate::process;
-
-// thread_local! {
-//     static CANCELLED: Rc<Cell<bool>> = Rc::new(Cell::new(false));
-// }
 
 #[wasm_bindgen]
 pub fn worker_entry() {

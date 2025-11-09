@@ -19,7 +19,7 @@ use crate::app::{
     calculate::util::{GenerationSettings, ProgressSink},
     preset::{Preset, UnprocessedPreset},
 };
-use egui::ahash::AHasher;
+use rustc_hash::FxHasher as AHasher;
 use pathfinding::prelude::Weights;
 use serde::{Deserialize, Serialize};
 
@@ -112,7 +112,7 @@ type FxIndexSet<K> = indexmap::IndexSet<K, std::hash::BuildHasherDefault<AHasher
 
 pub fn process_optimal<S: ProgressSink>(
     unprocessed: UnprocessedPreset,
-    target: UnprocessedPreset,
+    _target: UnprocessedPreset,
     settings: GenerationSettings,
     tx: &mut S,
     #[cfg(not(target_arch = "wasm32"))] cancel: Arc<AtomicBool>,
@@ -123,14 +123,8 @@ pub fn process_optimal<S: ProgressSink>(
         unprocessed.source_img.clone(),
     )
     .unwrap();
-    let target_img = image::ImageBuffer::from_vec(
-        target.width,
-        target.height,
-        target.source_img.clone(),
-    )
-    .unwrap();
     // let start_time = std::time::Instant::now();
-    let (source_pixels, target_pixels, weights) = util::get_images(source_img, target_img, &settings)?;
+    let (source_pixels, target_pixels, weights) = util::get_images(source_img, &settings)?;
 
     let weights = ImgDiffWeights {
         source: source_pixels.clone(),
@@ -358,7 +352,7 @@ const SWAPS_PER_GENERATION_PER_PIXEL: usize = 128;
 
 pub fn process_genetic<S: ProgressSink>(
     unprocessed: UnprocessedPreset,
-    target: UnprocessedPreset,
+    _target: UnprocessedPreset,
     settings: GenerationSettings,
     tx: &mut S,
     #[cfg(not(target_arch = "wasm32"))] cancel: Arc<AtomicBool>,
@@ -369,14 +363,8 @@ pub fn process_genetic<S: ProgressSink>(
         unprocessed.source_img.clone(),
     )
     .unwrap();
-    let target_img = image::ImageBuffer::from_vec(
-        target.width,
-        target.height,
-        target.source_img.clone(),
-    )
-    .unwrap();
     // let start_time = std::time::Instant::now();
-    let (source_pixels, target_pixels, weights) = util::get_images(source_img, target_img, &settings)?;
+    let (source_pixels, target_pixels, weights) = util::get_images(source_img, &settings)?;
 
     let mut pixels = source_pixels
         .iter()

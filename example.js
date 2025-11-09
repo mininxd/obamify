@@ -1,7 +1,11 @@
-import Generator from './generate.js';
+// To run this example, you would first need to publish the obamify package to npm.
+// Then, you would install it in your project with `npm install obamify`.
+
+import Generator from 'obamify';
 
 async function main() {
     const generator = new Generator({
+        gpu: true, // Use WebGPU for the computation
         onProgress: (progress) => {
             console.log(`Progress: ${progress * 100}%`);
         },
