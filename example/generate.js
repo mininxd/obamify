@@ -2,6 +2,8 @@ import init, { generate_with_gpu } from './pkg/obamify.js';
 
 class Generator {
     constructor(options = {}) {
+        this.width = options.width || 128;
+        this.height = options.height || 128;
         this.gpu = options.gpu || false;
         this.proximity = options.proximity || 25;
         this.method = options.method || 'optimal'; // or 'fast'
@@ -17,7 +19,7 @@ class Generator {
         }
     }
 
-    async generate(sourceImage, targetImage) {
+    async generate(sourceImageData, targetImageData) {
         await this.init_wasm();
 
         return new Promise((resolve, reject) => {
@@ -45,16 +47,16 @@ class Generator {
 
             const sourcePreset = {
                 name: 'source',
-                width: sourceImage.width,
-                height: sourceImage.height,
-                source_img: Array.from(sourceImage.data),
+                width: this.width,
+                height: this.height,
+                source_img: Array.from(sourceImageData),
             };
 
             const targetPreset = {
                 name: 'target',
-                width: targetImage.width,
-                height: targetImage.height,
-                source_img: Array.from(targetImage.data),
+                width: this.width,
+                height: this.height,
+                source_img: Array.from(targetImageData),
             }
 
             const settings = {
@@ -64,9 +66,9 @@ class Generator {
                 algorithm: this.method === 'optimal' ? 'Optimal' : 'Genetic',
                 sidelen: this.resolution,
                 custom_target: {
-                    w: targetImage.width,
-                    h: targetImage.height,
-                    data: Array.from(targetImage.data),
+                    w: this.width,
+                    h: this.height,
+                    data: Array.from(targetImageData),
                 },
                 target_crop_scale: { x: 0.0, y: 0.0, scale: 1.0 },
                 source_crop_scale: { x: 0.0, y: 0.0, scale: 1.0 },

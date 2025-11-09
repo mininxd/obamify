@@ -8,12 +8,16 @@
     "pkg"
   ],
   "scripts": {
-    "build": "wasm-pack build --target web"
+    "build": "wasm-pack build --target web",
+    "start": "http-server example"
   },
   "author": "Spu7Nix",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Spu7Nix/obamify.git"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
   }
 }

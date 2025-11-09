@@ -4,7 +4,12 @@
 import Generator from 'obamify';
 
 async function main() {
+    const width = 128;
+    const height = 128;
+
     const generator = new Generator({
+        width,
+        height,
         gpu: true, // Use WebGPU for the computation
         onProgress: (progress) => {
             console.log(`Progress: ${progress * 100}%`);
@@ -12,20 +17,11 @@ async function main() {
     });
 
     // Create placeholder images (replace with actual image loading)
-    const sourceImage = {
-        width: 128,
-        height: 128,
-        data: new Uint8Array(128 * 128 * 4).fill(255), // White image
-    };
-
-    const targetImage = {
-        width: 128,
-        height: 128,
-        data: new Uint8Array(128 * 128 * 4).fill(0), // Black image
-    };
+    const sourceImageData = new Uint8Array(width * height * 4).fill(255); // White image
+    const targetImageData = new Uint8Array(width * height * 4).fill(0); // Black image
 
     try {
-        const result = await generator.generate(sourceImage, targetImage);
+        const result = await generator.generate(sourceImageData, targetImageData);
         console.log('Generation complete!');
         // Display the result (e.g., on a canvas)
         const canvas = document.createElement('canvas');
