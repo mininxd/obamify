@@ -1,9 +1,16 @@
 use wasm_bindgen::prelude::*;
-use crate::app::calculate::util::{GenerationSettings, get_images};
+use crate::app::calculate::util::{GenerationSettings, get_images, ProgressSink, Algorithm};
 use crate::app::preset::{Preset, UnprocessedPreset};
 use rustc_hash::FxHasher as AHasher;
 use pathfinding::prelude::Weights;
 use indexmap::IndexSet;
+use crate::app::calculate::{ProgressMsg, heuristic, Pixel, SWAPS_PER_GENERATION_PER_PIXEL};
+use frand::Rand;
+
+struct HeadlessProgressSink;
+impl ProgressSink for HeadlessProgressSink {
+    fn send(&mut self, _msg: ProgressMsg) {}
+}
 
 #[wasm_bindgen]
 pub struct Generator {
@@ -25,8 +32,11 @@ impl Generator {
         let _target: UnprocessedPreset = serde_wasm_bindgen::from_value(target_image)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-        let result = self.process_optimal(unprocessed)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let result = match self.settings.algorithm {
+            Algorithm::Optimal => self.process_optimal(unprocessed),
+            Algorithm::Genetic => self.process_fast(unprocessed),
+        }
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         Ok(serde_wasm_bindgen::to_value(&result).unwrap())
     }
@@ -145,6 +155,99 @@ impl Generator {
             assignments,
         })
     }
+
+    fn process_fast(&self, unprocessed: UnprocessedPreset) -> Result<Preset, Box<dyn std::error::Error>> {
+        let source_img = image::ImageBuffer::from_vec(
+            unprocessed.width,
+            unprocessed.height,
+            unprocessed.source_img.clone(),
+        )
+        .unwrap();
+        let (source_pixels, target_pixels, weights) = get_images(source_img, &self.settings)?;
+
+        let mut pixels = source_pixels
+            .iter()
+            .enumerate()
+            .map(|(i, &(r, g, b))| {
+                let x = (i as u32 % self.settings.sidelen) as u16;
+                let y = (i as u32 / self.settings.sidelen) as u16;
+                let mut p = Pixel::new(x, y, (r, g, b), 0);
+                let h = p.calc_heuristic(
+                    (x, y),
+                    target_pixels[i],
+                    weights[i],
+                    self.settings.proximity_importance,
+                );
+                p.update_heuristic(h);
+                p
+            })
+            .collect::<Vec<_>>();
+
+        let mut rng = Rand::with_seed(12345);
+        let swaps_per_generation = SWAPS_PER_GENERATION_PER_PIXEL * pixels.len();
+
+        let mut max_dist = self.settings.sidelen;
+        loop {
+            let mut swaps_made = 0;
+            for _ in 0..swaps_per_generation {
+                let apos = rng.gen_range(0..pixels.len() as u32) as usize;
+                let ax = apos as u16 % self.settings.sidelen as u16;
+                let ay = apos as u16 / self.settings.sidelen as u16;
+                let bx = (ax as i16 + rng.gen_range(-(max_dist as i16)..(max_dist as i16 + 1)))
+                    .clamp(0, self.settings.sidelen as i16 - 1) as u16;
+                let by = (ay as i16 + rng.gen_range(-(max_dist as i16)..(max_dist as i16 + 1)))
+                    .clamp(0, self.settings.sidelen as i16 - 1) as u16;
+                let bpos = by as usize * self.settings.sidelen as usize + bx as usize;
+
+                let t_a = target_pixels[apos];
+                let t_b = target_pixels[bpos];
+
+                let a_on_b_h = pixels[apos].calc_heuristic(
+                    (bx, by),
+                    t_b,
+                    weights[bpos],
+                    self.settings.proximity_importance,
+                );
+
+                let b_on_a_h = pixels[bpos].calc_heuristic(
+                    (ax, ay),
+                    t_a,
+                    weights[apos],
+                    self.settings.proximity_importance,
+                );
+
+                let improvement_a = pixels[apos].h - b_on_a_h;
+                let improvement_b = pixels[bpos].h - a_on_b_h;
+                if improvement_a + improvement_b > 0 {
+                    // swap
+                    pixels.swap(apos, bpos);
+                    pixels[apos].update_heuristic(b_on_a_h);
+                    pixels[bpos].update_heuristic(a_on_b_h);
+                    swaps_made += 1;
+                }
+            }
+
+            let assignments = pixels
+                .iter()
+                .map(|p| p.src_y as usize * self.settings.sidelen as usize + p.src_x as usize)
+                .collect::<Vec<_>>();
+            if max_dist < 4 && swaps_made < 10 {
+                return Ok(Preset {
+                    inner: UnprocessedPreset {
+                        name: unprocessed.name,
+                        width: self.settings.sidelen,
+                        height: self.settings.sidelen,
+                        source_img: source_pixels
+                            .iter()
+                            .flat_map(|(r, g, b)| [*r, *g, *b])
+                            .collect(),
+                    },
+                    assignments,
+                });
+            }
+            max_dist = (max_dist as f32 * 0.99).max(2.0) as u32;
+        }
+    }
 }
 
 struct ImgDiffWeights<'a> {
@@ -184,22 +287,6 @@ impl Weights<i64> for ImgDiffWeights<'_> {
     fn neg(&self) -> Self {
         todo!()
     }
-}
-
-#[inline(always)]
-fn heuristic(
-    apos: (u16, u16),
-    bpos: (u16, u16),
-    a: (u8, u8, u8),
-    b: (u8, u8, u8),
-    color_weight: i64,
-    spatial_weight: i64,
-) -> i64 {
-    let spatial = (apos.0 as i64 - bpos.0 as i64).pow(2) + (apos.1 as i64 - bpos.1 as i64).pow(2);
-    let color = (a.0 as i64 - b.0 as i64).pow(2)
-        + (a.1 as i64 - b.1 as i64).pow(2)
-        + (a.2 as i64 - b.2 as i64).pow(2);
-    color * color_weight + (spatial * spatial_weight).pow(2)
 }
 
 type FxIndexSet<K> = IndexSet<K, std::hash::BuildHasherDefault<AHasher>>;
