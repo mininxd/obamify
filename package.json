@@ -1,0 +1,24 @@
+{
+  "name": "obamify",
+  "version": "0.3.0",
+  "description": "Revolutionary new technology that turns any image into obama",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "pkg"
+  ],
+  "scripts": {
+    "build": "wasm-pack build --target web",
+    "start": "vite example"
+  },
+  "author": "Spu7Nix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Spu7Nix/obamify.git"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "vite": "^5.2.0"
+  }
+}

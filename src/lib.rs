@@ -1,6 +1,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod app;
-pub use app::ObamifyApp;
 #[cfg(target_arch = "wasm32")]
-pub use app::worker_entry;
+pub use app::calculate::worker::worker_entry;
+#[cfg(target_arch = "wasm32")]
+pub use app::headless::Generator;

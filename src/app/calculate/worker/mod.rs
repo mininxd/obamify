@@ -1,22 +1,22 @@
-use eframe::wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use serde::{Deserialize, Serialize};
 use web_sys::DedicatedWorkerGlobalScope;
 use web_sys::js_sys;
 
+use crate::app::calculate::ProgressMsg;
+use crate::app::headless::Generator;
+use crate::app::preset::UnprocessedPreset;
+use crate::app::calculate::util::GenerationSettings;
+
 #[derive(Serialize, Deserialize)]
 pub enum WorkerReq {
     Process {
-        source: crate::app::preset::UnprocessedPreset,
-        settings: super::GenerationSettings,
+        source: UnprocessedPreset,
+        target: UnprocessedPreset,
+        settings: GenerationSettings,
     },
 }
-
-use crate::app::calculate::ProgressMsg;
-use crate::app::calculate::process;
-
-// thread_local! {
-//     static CANCELLED: Rc<Cell<bool>> = Rc::new(Cell::new(false));
-// }
 
 #[wasm_bindgen]
 pub fn worker_entry() {
@@ -24,7 +24,6 @@ pub fn worker_entry() {
     let global_for_handler = global.clone();
 
     let handler = Closure::wrap(Box::new(move |e: web_sys::MessageEvent| {
-        // Deserialize the incoming request
         let req: WorkerReq = match serde_wasm_bindgen::from_value(e.data()) {
             Ok(v) => v,
             Err(err) => {
@@ -37,20 +36,26 @@ pub fn worker_entry() {
         };
 
         match req {
-            WorkerReq::Process { source, settings } => {
-                // Run job; if you need to keep the UI responsive in the worker,
-                // wrap in an async task and yield occasionally.
-                let global2 = global_for_handler.clone();
+            WorkerReq::Process {
+                source,
+                target,
+                settings,
+            } => {
+                let generator = Generator::new(serde_wasm_bindgen::to_value(&settings).unwrap()).unwrap();
 
-                // progress sink -> postMessage
-                let mut sink = |msg: ProgressMsg| {
-                    let _ = global2.post_message(&serde_wasm_bindgen::to_value(&msg).unwrap());
-                };
-
-                // If you need to yield, you can insert tiny awaits between steps.
-                // Here we just call the portable sync fn:
-                if let Err(e) = process(source, settings, &mut sink) {
-                    sink(ProgressMsg::Error(e.to_string()));
+                match generator.generate(
+                    serde_wasm_bindgen::to_value(&source).unwrap(),
+                    serde_wasm_bindgen::to_value(&target).unwrap(),
+                ) {
+                    Ok(result) => {
+                        let _ = global_for_handler.post_message(&result);
+                    }
+                    Err(e) => {
+                        let _ = global_for_handler.post_message(
+                            &serde_wasm_bindgen::to_value(&ProgressMsg::Error(format!("generation failed: {:?}", e)))
+                                .unwrap(),
+                        );
+                    }
                 }
             }
         }
